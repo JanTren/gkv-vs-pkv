@@ -26,9 +26,17 @@ export default function App() {
     gkvMaxRate: 24.0,
     pkvInflation: 3.5,
     salaryGrowth: 2.5,
-    // 2.3 — PV Kinderlosenzuschlag
+    // 2.3 — Pflegeversicherung & Familienplanung
     hasChildren: false,
     numberOfChildren: 0,
+    pkvKindBeitrag: 150,
+    pkvKinderDauer: 20,
+    // 1.1 — GKV-Zusatzversicherung
+    gkvZusatzBeitrag: 0,
+    gkvZusatzInflation: 5.0,
+    // 4.1 — Schock-Event
+    simulateShockEvent: false,
+    shockEventAge: 50,
     // 2.1 — PKV-Inflation in der Rentenphase
     pkvInflationRetirement: 2.5,
     // 3.1 — Reale Werte
@@ -56,7 +64,7 @@ export default function App() {
     : results.finalDeltaDepot;
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-8 font-sans text-ink bg-bg min-h-screen">
+    <div className="w-full px-4 md:px-8 xl:px-12 py-4 md:py-8 font-sans text-ink bg-bg min-h-screen">
       <header className="mb-8 border-b border-border pb-6">
         <h1 className="text-3xl font-display font-bold text-ink mb-2">
           GKV vs. PKV: Der Lebenszyklus-Rechner
@@ -76,10 +84,10 @@ export default function App() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 xl:grid-cols-12 gap-8">
 
         {/* ── Sidebar Inputs ── */}
-        <div className="lg:col-span-3 space-y-6">
+        <div className="lg:col-span-4 xl:col-span-3 space-y-6">
 
           {/* Persönliche Daten */}
           <div className="bg-white p-5 rounded-lg border border-border shadow-sm">
@@ -124,12 +132,32 @@ export default function App() {
                 </label>
               </div>
               {inputs.hasChildren && (
-                <label className="block">
-                  <span className="input-label">Kinder unter 25 (Anzahl)</span>
-                  <input type="number" name="numberOfChildren"
-                    value={inputs.numberOfChildren}
-                    onChange={handleChange} className="input-field" min="1" max="10" />
-                </label>
+                <div className="space-y-4 pt-2 border-t border-border mt-2">
+                  <label className="block">
+                    <span className="input-label">Kinder unter 25 (Anzahl)</span>
+                    <input type="number" name="numberOfChildren"
+                      value={inputs.numberOfChildren}
+                      onChange={handleChange} className="input-field" min="1" max="10" />
+                  </label>
+                  <label className="block">
+                    <span className="input-label">PKV-Beitrag pro Kind (€/Monat)</span>
+                    <input type="number" name="pkvKindBeitrag"
+                      value={inputs.pkvKindBeitrag}
+                      onChange={handleChange} className="input-field" step="10" />
+                    <span className="text-xs text-muted">
+                      In der GKV beitragsfrei. In der PKV voll aus dem Netto zu zahlen (wenn AG-Zuschuss Max erreicht).
+                    </span>
+                  </label>
+                  <label className="block">
+                    <span className="input-label">Dauer der Kinder-Versicherung (Jahre ab heute)</span>
+                    <input type="number" name="pkvKinderDauer"
+                      value={inputs.pkvKinderDauer}
+                      onChange={handleChange} className="input-field" step="1" />
+                    <span className="text-xs text-muted">
+                      Wie lange werden die Kinderbeiträge noch gezahlt?
+                    </span>
+                  </label>
+                </div>
               )}
             </div>
           </div>
@@ -149,6 +177,31 @@ export default function App() {
                 <span className="input-label">Beitragsentlastung im Alter (€/Monat)</span>
                 <input type="number" name="pkvBet" value={inputs.pkvBet}
                   onChange={handleChange} className="input-field" step="10" />
+              </label>
+            </div>
+          </div>
+
+          {/* Leistungsniveau Angleichen (GKV-Zusatz) */}
+          <div className="bg-white p-5 rounded-lg border border-border shadow-sm">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-amber mb-4">
+              Leistungsniveau (GKV-Zusatz)
+            </h2>
+            <div className="space-y-4">
+              <label className="block">
+                <span className="input-label">Zusatzversicherungen (€/Monat)</span>
+                <input type="number" name="gkvZusatzBeitrag" value={inputs.gkvZusatzBeitrag}
+                  onChange={handleChange} className="input-field" step="10" />
+                <span className="text-xs text-muted">
+                  Krankenhaus 1-Bett, Zahnzusatz etc. für den GKV-Versicherten, um das PKV-Niveau zu erreichen.
+                </span>
+              </label>
+              <label className="block">
+                <span className="input-label">Zusatz-Kostensteigerung (% p.a.)</span>
+                <input type="number" name="gkvZusatzInflation" value={inputs.gkvZusatzInflation}
+                  onChange={handleChange} className="input-field" step="0.5" />
+                <span className="text-xs text-muted">
+                  Meist nach Art der Schadenversicherung ohne Altersrückstellungen kalkuliert (z.B. 5%).
+                </span>
               </label>
             </div>
           </div>
@@ -199,10 +252,40 @@ export default function App() {
               </label>
             </div>
           </div>
+
+          {/* Schock-Event (Risikoszenario) */}
+          <div className="bg-white p-5 rounded-lg border border-red-100 shadow-sm">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-red-500 mb-4 flex items-center gap-2">
+              <span>⚠️</span> Schock-Event
+            </h2>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <input type="checkbox" name="simulateShockEvent" id="simulateShockEvent"
+                  checked={inputs.simulateShockEvent} onChange={handleChange}
+                  className="w-4 h-4 accent-red-500" />
+                <label htmlFor="simulateShockEvent" className="input-label cursor-pointer text-red-600">
+                  Langzeiterkrankung simulieren (1 Jahr)
+                </label>
+              </div>
+              {inputs.simulateShockEvent && (
+                <div className="pt-2">
+                  <label className="block">
+                    <span className="input-label">Alter bei Erkrankung</span>
+                    <input type="number" name="shockEventAge" value={inputs.shockEventAge}
+                      onChange={handleChange} className="input-field border-red-200 focus:border-red-500 focus:ring-red-500" min={inputs.currentAge} max={inputs.retirementAge - 1} />
+                    <span className="text-xs text-red-500/80 block mt-1">
+                      GKV zahlt nach 6 Wochen Krankengeld (beitragsfrei!). 
+                      PKV-Beitrag muss dagegen vom Netto voll (ohne AG-Zuschuss) weiterbezahlt werden!
+                    </span>
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* ── Charts ── */}
-        <div className="lg:col-span-6 space-y-8">
+        <div className="lg:col-span-8 xl:col-span-6 space-y-8">
 
           {/* Chart 1: Depot-Entwicklung */}
           <div className="bg-white p-6 rounded-lg border border-border shadow-sm">
@@ -300,7 +383,7 @@ export default function App() {
         </div>
 
         {/* ── KPIs ── */}
-        <div className="lg:col-span-3 space-y-4">
+        <div className="lg:col-span-12 xl:col-span-3 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-1 gap-4">
 
           <div className={`p-5 rounded-lg border shadow-sm ${
             results.depotZeroAge ? 'bg-red-50 border-red-200' : 'bg-amber-lt border-amber'
@@ -452,8 +535,10 @@ export default function App() {
                     festgeschrieben (§ 22 EStG).
                   </li>
                   <li>
-                    <strong>KVdR:</strong> Halber KV-Satz auf Bruttorente; voller PV-Satz allein
-                    vom Rentner.
+                    <strong>PKV-Basistarif (Notnagel):</strong> Wenn das Delta-Depot in der Rente aufgebraucht ist (Bankrott), wird der PKV-Beitrag hart auf den gesetzlichen GKV-Höchstbeitrag gedeckelt. Das entspricht einem Wechsel in den PKV-Basistarif.
+                  </li>
+                  <li>
+                    <strong>Schock-Event (Langzeiterkrankung):</strong> Bei Simulation wird ein ganzes Jahr berechnet, in dem nach 6 Wochen Lohnfortzahlung das Krankengeld/Krankentagegeld greift. Während der GKV-Versicherte beitragsfrei ist, muss in der PKV der volle Beitrag (ohne AG-Zuschuss) weitergezahlt werden.
                   </li>
                   <li>
                     <strong>Real-Ansicht:</strong> Das Depot wird mit der eingestellten

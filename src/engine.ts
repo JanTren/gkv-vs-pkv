@@ -113,12 +113,20 @@ export interface PkvGkvInputs {
   gkvMaxRate: number;             // Ziel-Gesamtbeitragssatz GKV+PV 2040 (%), Basis: mit Kindern
   pkvInflation: number;           // PKV-Kostensteigerung (% p.a.)
   salaryGrowth: number;           // Lohnwachstum (% p.a.)
+  // 1.1 — GKV-Zusatzversicherung
+  gkvZusatzBeitrag: number;       // Startbeitrag (€/Monat)
+  gkvZusatzInflation: number;     // Kostensteigerung (% p.a.)
   // 2.3 — Pflegeversicherung
   hasChildren: boolean;
   numberOfChildren: number;       // Kinder unter 25
+  pkvKindBeitrag: number;         // PKV-Beitrag pro Kind (€/Monat)
+  pkvKinderDauer: number;         // Wie viele Jahre ab heute müssen Kinderversicherungen gezahlt werden?
   // 2.1 — PKV-Inflation in der Rentenphase
   pkvInflationRetirement: number; // (% p.a.), Default 2.5
   assumedInflation: number;       // Allgemeine Inflation für Real-Deflator (% p.a.), Default 2.0
+  // 4.1 — Schock-Event (Langzeiterkrankung 1 Jahr)
+  simulateShockEvent: boolean;
+  shockEventAge: number;          // z.B. 50
 }
 
 export interface YearlyData {
@@ -185,6 +193,8 @@ export function simulatePkvGkv(inputs: PkvGkvInputs): PkvGkvResults {
   let currentSalary = inputs.grossIncome;
   let currentBbg = BBG_2026;
   let currentPkvPremium = inputs.pkvPremium * 12; // Jahresbeitrag, inkl. 10 %-Zuschlag
+  let currentGkvZusatzPremium = inputs.gkvZusatzBeitrag * 12;
+  let currentPkvKindPremium = inputs.pkvKindBeitrag * 12;
 
   const yieldFactor = 1 + inputs.etfYield / 100;
 
@@ -257,39 +267,74 @@ export function simulatePkvGkv(inputs: PkvGkvInputs): PkvGkvResults {
       // -----------------------------------------------------------------------
       const assessableIncome = Math.min(currentSalary, currentBbg);
 
+      // Schock-Event (Langzeiterkrankung für 1 Jahr)
+      let workedFraction = 1.0;
+      let sickFraction = 0.0;
+      if (inputs.simulateShockEvent && age === inputs.shockEventAge) {
+        workedFraction = 1.5 / 12; // 6 Wochen Lohnfortzahlung
+        sickFraction = 10.5 / 12;  // 10,5 Monate Krankengeld/KTG
+      }
+
       // 1.2 — KV und PV getrennt für steuerliche Absetzbarkeit
       const kvCostEmployee = (assessableIncome * kvRateRamped) / 2;
-      // PV-Arbeitnehmeranteil: inkl. Kinderlosenzuschlag / Kinderabschlag
       const pvCostEmployee = pvRates.arbeitnehmer * assessableIncome;
-      const gkvCostEmployee = kvCostEmployee + pvCostEmployee;
+      const normalGkvCostEmployee = kvCostEmployee + pvCostEmployee;
+      
+      // Während Krankengeld ist man in der GKV beitragsfrei!
+      const gkvCostEmployeeEffective = normalGkvCostEmployee * workedFraction;
 
       // 1.2 — § 10 Abs. 1 Nr. 3 Satz 4 EStG: KV-Anteil um 4 % kürzen (Krankengeldbezug)
       const gkvDeductible = kvCostEmployee * 0.96 + pvCostEmployee;
+      const effectiveGkvDeductible = gkvDeductible * workedFraction;
+
+      // 1.1 — GKV-Zusatzversicherung (voll aus dem Netto zu zahlen, auch bei Krankheit!)
+      const gkvZusatzCostEmployee = currentGkvZusatzPremium;
 
       // PKV-Arbeitgeberzuschuss (gedeckelt auf 50 % des fiktiven GKV-Höchstbeitrags)
       const maxAgZuschuss = (currentBbg * personTotalGkvRate) / 2;
-      const actualAgZuschuss = Math.min(currentPkvPremium / 2, maxAgZuschuss);
-      const pkvCostEmployee = currentPkvPremium - actualAgZuschuss;
 
-      // Steuerberechnung GKV (1.2: gkvDeductible statt vollem gkvCostEmployee)
+      // PKV Kinderkosten
+      let totalPkvPremiumForZuschuss = currentPkvPremium;
+      const childYearsElapsed = age - inputs.currentAge;
+      if (inputs.hasChildren && inputs.numberOfChildren > 0 && childYearsElapsed < inputs.pkvKinderDauer) {
+        totalPkvPremiumForZuschuss += (currentPkvKindPremium * inputs.numberOfChildren);
+      }
+
+      // AG-Zuschuss auf den Gesamtbeitrag (Erwachsener + Kinder) anwenden
+      const normalActualAgZuschuss = Math.min(totalPkvPremiumForZuschuss / 2, maxAgZuschuss);
+      
+      // AG-Zuschuss gibt es in der PKV nur während der Lohnfortzahlung (6 Wochen)
+      const effectiveAgZuschuss = normalActualAgZuschuss * workedFraction;
+      // Der PKV-Beitrag muss das ganze Jahr voll bezahlt werden!
+      const pkvCostEmployeeEffective = totalPkvPremiumForZuschuss - effectiveAgZuschuss;
+
+      // Einkommen im Schock-Jahr
+      // Krankengeld/KTG (ca. 70% der BBG max, oder 70% Brutto)
+      const kgMonthly = Math.min(currentSalary / 12, currentBbg / 12) * 0.7;
+      const sickIncomeYearly = kgMonthly * 12 * sickFraction;
+      const normalIncomeYearly = currentSalary * workedFraction;
+      const totalIncome = normalIncomeYearly + sickIncomeYearly;
+
+      // Steuerberechnung GKV
       const taxGkv = calculateIncomeTax(
-        Math.max(0, currentSalary - gkvDeductible),
+        Math.max(0, normalIncomeYearly - effectiveGkvDeductible),
         currentYear
       );
 
-      // Steuerberechnung PKV: 80 % Basisabsicherung, abzgl. steuerfreier AG-Zuschuss
-      const pkvBasisabsicherung = currentPkvPremium * 0.8;
-      const pkvDeductible = Math.max(0, pkvBasisabsicherung - actualAgZuschuss);
+      // Steuerberechnung PKV
+      const pkvBasisabsicherung = totalPkvPremiumForZuschuss * 0.8;
+      // Absetzbar ist die gezahlte Basisabsicherung abzgl. des geflossenen AG-Zuschusses
+      const effectivePkvDeductible = Math.max(0, pkvBasisabsicherung - effectiveAgZuschuss);
       const taxPkv = calculateIncomeTax(
-        Math.max(0, currentSalary - pkvDeductible),
+        Math.max(0, normalIncomeYearly - effectivePkvDeductible),
         currentYear
       );
 
-      const netIncomeGkv = currentSalary - gkvCostEmployee - taxGkv;
-      const netIncomePkv = currentSalary - pkvCostEmployee - taxPkv;
+      const netIncomeGkv = totalIncome - gkvCostEmployeeEffective - gkvZusatzCostEmployee - taxGkv;
+      const netIncomePkv = totalIncome - pkvCostEmployeeEffective - taxPkv;
 
-      tcoGkv += gkvCostEmployee;
-      tcoPkv += pkvCostEmployee;
+      tcoGkv += gkvCostEmployeeEffective + gkvZusatzCostEmployee;
+      tcoPkv += pkvCostEmployeeEffective;
 
       netDelta = netIncomePkv - netIncomeGkv;
 
@@ -297,13 +342,15 @@ export function simulatePkvGkv(inputs: PkvGkvInputs): PkvGkvResults {
       { const r = applyDepotGrowth(currentDepot, capitalInvested, netDelta, yieldFactor);
         currentDepot = r.depot; capitalInvested = r.capital; }
 
-      monthlyGkv = gkvCostEmployee / 12;
-      monthlyPkv = pkvCostEmployee / 12;
+      monthlyGkv = (gkvCostEmployeeEffective + gkvZusatzCostEmployee) / 12;
+      monthlyPkv = pkvCostEmployeeEffective / 12;
 
       // Dynamik für nächstes Jahr
       currentSalary *= 1 + inputs.salaryGrowth / 100;
       currentBbg *= 1 + inputs.salaryGrowth / 100;
       currentPkvPremium *= 1 + inputs.pkvInflation / 100;
+      currentGkvZusatzPremium *= 1 + inputs.gkvZusatzInflation / 100;
+      currentPkvKindPremium *= 1 + inputs.pkvInflation / 100;
 
       if (projectedPension > 0) {
         projectedPension *= 1 + inputs.salaryGrowth / 100;
@@ -375,9 +422,22 @@ export function simulatePkvGkv(inputs: PkvGkvInputs): PkvGkvResults {
       retirementPension *= 1 + pensionGrowth / 100;
     }
 
-    // Depot-Bankrott prüfen
+    // Depot-Bankrott prüfen & PKV-Basistarif (Notnagel)
     if (currentDepot < 0 && depotZeroAge === null) {
       depotZeroAge = age;
+    }
+
+    if (depotZeroAge !== null && currentDepot < 0) {
+      // Wenn das Depot insolvent ist, setzen wir es auf 0, um absurde Negativwerte zu vermeiden.
+      // Der Versicherte muss sich massiv einschränken (Lebensstandard sinkt), aber er hat keine Schulden in Millionenhöhe.
+      currentDepot = 0;
+      
+      // Gleichzeitig greift der Notnagel: Der Wechsel in den PKV-Basistarif (Leistungen auf GKV-Niveau).
+      // Dieser ist gesetzlich auf den GKV-Höchstbeitrag (KV + PV) gedeckelt.
+      const gkvHoechstbeitrag = (currentBbg * kvRateRamped) + (currentBbg * pvRates.gesamt);
+      if (currentPkvPremium > gkvHoechstbeitrag) {
+        currentPkvPremium = gkvHoechstbeitrag;
+      }
     }
 
     // 3.1 — Real-Deflator für Kaufkraftkorrektur
