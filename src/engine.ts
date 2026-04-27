@@ -116,9 +116,8 @@ export interface PkvGkvInputs {
   // 2.3 — Pflegeversicherung
   hasChildren: boolean;
   numberOfChildren: number;       // Kinder unter 25
-  // 2.1 — PKV-Inflations-Dämpfung im Alter
-  pkvInflationDampeningRetirement: number; // 0–1, Default 0.75
-  // 3.1 — Reale Werte
+  // 2.1 — PKV-Inflation in der Rentenphase
+  pkvInflationRetirement: number; // (% p.a.), Default 2.5
   assumedInflation: number;       // Allgemeine Inflation für Real-Deflator (% p.a.), Default 2.0
 }
 
@@ -209,9 +208,6 @@ export function simulatePkvGkv(inputs: PkvGkvInputs): PkvGkvResults {
   let firstYearGkvCostRetirement = 0;
 
   const yearlyData: YearlyData[] = [];
-
-  // -- Dämpfungsfaktor für PKV-Inflation im Alter --
-  const dampeningFactor = inputs.pkvInflationDampeningRetirement ?? 0.75;
 
   // ============================================================================
   // HAUPTSCHLEIFE
@@ -372,9 +368,8 @@ export function simulatePkvGkv(inputs: PkvGkvInputs): PkvGkvResults {
         firstYearGkvCostRetirement = monthlyGkv;
       }
 
-      // 2.1 — PKV-Inflation im Alter parametrisierbar gedämpft (Default: 75 % statt 50 %)
-      const dampenedPkvInflation = inputs.pkvInflation * dampeningFactor;
-      currentPkvPremium *= 1 + dampenedPkvInflation / 100;
+      // 2.1 — PKV-Inflation in der Rentenphase (durch Altersrückstellungen idR niedriger als in der Erwerbsphase)
+      currentPkvPremium *= 1 + inputs.pkvInflationRetirement / 100;
 
       const pensionGrowth = Math.max(0, inputs.salaryGrowth - 0.5);
       retirementPension *= 1 + pensionGrowth / 100;

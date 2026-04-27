@@ -29,8 +29,8 @@ export default function App() {
     // 2.3 — PV Kinderlosenzuschlag
     hasChildren: false,
     numberOfChildren: 0,
-    // 2.1 — PKV-Inflation Dämpfung
-    pkvInflationDampeningRetirement: 0.75,
+    // 2.1 — PKV-Inflation in der Rentenphase
+    pkvInflationRetirement: 2.5,
     // 3.1 — Reale Werte
     assumedInflation: 2.0,
   });
@@ -180,17 +180,13 @@ export default function App() {
                   onChange={handleChange} className="input-field" step="0.1" />
               </label>
 
-              {/* 2.1 — PKV-Inflationsdämpfung im Alter */}
+              {/* 2.1 — PKV-Inflation in der Rentenphase */}
               <label className="block">
-                <span className="input-label">
-                  PKV-Inflationsdämpfung im Alter: {Math.round(inputs.pkvInflationDampeningRetirement * 100)} %
-                </span>
-                <input type="range" name="pkvInflationDampeningRetirement"
-                  min="0.4" max="1.0" step="0.05"
-                  value={inputs.pkvInflationDampeningRetirement}
-                  onChange={handleChange} className="w-full accent-amber" />
+                <span className="input-label">PKV Kostensteigerung i.d. Rente (% p.a.)</span>
+                <input type="number" name="pkvInflationRetirement" value={inputs.pkvInflationRetirement}
+                  onChange={handleChange} className="input-field" step="0.1" />
                 <span className="text-xs text-muted">
-                  Wie stark wirken Altersrückstellungen? (40 % = starke Dämpfung · 100 % = keine Dämpfung)
+                  Durch Altersrückstellungen meist geringer als in der Erwerbsphase.
                 </span>
               </label>
 
@@ -424,8 +420,7 @@ export default function App() {
                     Der 10 %-Zuschlag wurde bereits mit 60 entfernt.
                   </li>
                   <li>
-                    <strong>PKV-Inflation im Alter:</strong> Wird durch Altersrückstellungen
-                    gedämpft — parametrisierbar (Default: 75 %).
+                    <strong>PKV-Inflation im Alter:</strong> Ist im Modell separat als absoluter Prozentsatz einstellbar (z.B. 2,5 % p.a.), da gesetzliche und tarifliche Altersrückstellungen die Beitragssteigerungen dämpfen.
                   </li>
                   <li>
                     <strong>Abgeltungsteuer:</strong> Beim Depot-Verzehr wird die effektive
