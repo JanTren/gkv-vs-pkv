@@ -2,7 +2,7 @@
 
 Ein hochdetaillierter, datengetriebener interaktiver Simulator zum finanziellen Vergleich zwischen Gesetzlicher Krankenversicherung (GKV) und Privater Krankenversicherung (PKV) über den gesamten Lebenszyklus hinweg (Erwerbsphase und Rentenphase).
 
-Dieses Projekt ist eine isolierte, eigenständige React-Anwendung, die ich ursprünglich als Teil meines Deltaeffekt-Projekts entwickelt habe.
+Dieses Projekt ist eine isolierte, eigenständige React-Anwendung.
 
 ## Features
 
@@ -10,7 +10,7 @@ Dieses Projekt ist eine isolierte, eigenständige React-Anwendung, die ich urspr
 * PKV-Beitragsentwicklung: Detaillierte Berechnung der PKV-Beiträge mit und ohne Beitragsentlastungstarife (BET), inklusive Arbeitgeberzuschuss und Altersrückstellungen.
 * DRV-Zuschuss (Rentenphase): Ich berechne präzise den Zuschuss der Deutschen Rentenversicherung zur Krankenversicherung der Rentner, unter Berücksichtigung von Beitragsbemessungsgrenzen.
 * Depot-Verzehr und Kapitalaufbau: 
-  * In der Erwerbsphase: Die monatliche Differenz (Deltaeffekt) aus geringeren PKV-Beiträgen im Vergleich zur GKV lege ich mit einer angenommenen Rendite in einem ETF-Depot an.
+  * In der Erwerbsphase: Die monatliche Differenz aus geringeren PKV-Beiträgen im Vergleich zur GKV lege ich mit einer angenommenen Rendite in einem ETF-Depot an.
   * In der Rentenphase: Das aufgebaute Depot entspare ich, um die in der Rente meist höheren PKV-Beiträge auszugleichen. Mein Simulator berechnet exakt, wann das Depot erschöpft ist (Depot-Exhaustion).
 * Visuelle Analysen: Interaktive Charts (Recharts) visualisieren Beitragsverläufe und Depot-Entwicklungen über Jahrzehnte.
 
