@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-ink: #1A1A1A;
+  --color-amber: #D4821A;
+  --color-bg: #F7F5F2;
+}
+
+body {
+  margin: 0;
+  font-family: "Source Sans 3", system-ui, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+}
+
+/* Base Form Styling */
+.input-label {
+  @apply block text-xs font-semibold uppercase tracking-wider text-muted mb-1;
+}
+.input-field {
+  @apply w-full border border-border rounded-md px-3 py-2 bg-white focus:outline-none focus:border-amber focus:ring-1 focus:ring-amber transition-colors;
+}
