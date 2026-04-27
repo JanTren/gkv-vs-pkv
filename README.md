@@ -157,4 +157,4 @@ Ich berechne die exakte tarifliche Einkommensteuer nach folgendem Ablauf:
 7. JAEG-Prüfung: Ich prüfe die PKV-Zugangsberechtigung anhand des Startgehalts gegen die JAEG 2026. Eine dynamische Prüfung in Folgejahren führe ich nicht durch.
 
 ## Lizenz
-Alle Rechte vorbehalten. Copyright JanTren / Deltaeffekt.
+Alle Rechte vorbehalten. Copyright JanTren.
